@@ -83,11 +83,19 @@ def summary():
         if request.json:
             data = request.get_json()
             insert_summary(data['out'], data['in'])
-        return 'Success'
+            return redirect(url_for('.summary'))
 
-@frontend.route('/tracker', methods=['GET'])
+@frontend.route('/tracker', methods=['GET', 'POST'])
 def tracker():
-    return render_template('tracker.html', result=get_all_entry())
+    if request.method == 'GET':
+        return render_template('tracker.html', result=get_all_entry())
+    if request.method == 'POST':
+        if request.json:
+            data = request.get_json()
+            for uid in data:
+                update_slot(uid, True if data[uid] == 'True' else False)
+            return redirect(url_for('.tracker'))
+
 
 # Shows a long signup form, demonstrating form rendering.
 @frontend.route('/signin', methods=['GET', 'POST'])
@@ -107,16 +115,6 @@ def signin():
         return redirect(url_for('.index'))
 
     return render_template('signup.html', form=form)
-
-
-@frontend.route('/update', methods=['POST'])
-def update():
-    if request.method == 'POST':
-        if request.json:
-            data = request.get_json()
-            for uid in data:
-                update_slot(uid, True if data[uid] == 'True' else False)
-    #return "Success"
 
 @frontend.route('/about', methods=['GET'])
 def about():

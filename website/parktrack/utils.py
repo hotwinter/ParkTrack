@@ -1,5 +1,6 @@
 from models import Park, NumCar
 from database import db_session
+from sqlalchemy import desc
 
 def update_slot(uid, status): 
     park = Park.query.filter(Park.uid == uid).first()
@@ -28,7 +29,7 @@ def insert_summary(out_num, in_num):
     db_session.commit()
 
 def get_num():
-    result = NumCar.query.order_by('-id').first()
+    result = NumCar.query.order_by(desc('id')).first()
     if result:
         return {"out": result.out_num, "in": result.in_num, "num":result.in_num-result.out_num}
     else:

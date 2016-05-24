@@ -9,6 +9,7 @@ import sllurp.llrp as llrp
 from sllurp.llrp_proto import Modulation_Name2Type, DEFAULT_MODULATION, \
     Modulation_DefaultTari
 import requests
+import json
 
 startTime = None
 endTime = None
@@ -20,8 +21,8 @@ args = None
 init = True
 
 
-parking_lot = {'0088038c06013310000437c7': True, '300833b2ddd9048035050000': True}
-tag_num_to_name = {'300833b2ddd9048035050000':'tag1', '0088038c06013310000437c7':'tag2'}
+prev_res = []
+headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}
 def startTimeMeasurement():
     global startTime
     startTime = time.time()
@@ -54,38 +55,27 @@ def getStuff(tag):
 
 def tagReportCallback(llrpMsg):
     """Function to run each time the reader reports seeing tags."""
-    global init
     tags = llrpMsg.msgdict['RO_ACCESS_REPORT']['TagReportData']
     tags.sort()
-    if init:
-        print("Adding tags in the parking lot")
-        for tag in tags:
-            name, strength = getStuff(tag)
-            parking_lot[name] = True
-        init = False
-        #print("Added tags:" + " ".join(tag['EPC-96'] for tag in tags))
-    else:
-        #print("Seen tags:" + " ".join(tag['EPC-96'] for tag in tags))
-    if not tags:
-        print("Parking lot full!!")
-        return
+    seen = []
     for tag in tags:
         name, strength = getStuff(tag)
-    parked = list(set(parking_lot.keys()).difference([tag['EPC-96'] for tag in tags]))
-    json_dict = {}
-    for i in parking_lot:
-        if i in parked:
-            json_dict[i] = 'True'
-        else:
-            json_dict[i] = 'False'
-    new_parked = []
-    for i in parked:
-        if i in tag_num_to_name:
-            new_parked.append(tag_num_to_name[i])
-        else:
-            new_parked.append(i)
-    print("Current Parked parking_lot: %s" % str(new_parked))
-    requests.post('http://127.0.0.1:5000/update', json=json_dict)
+        seen.append(name)
+    if seen == prevres:
+        # nothing changed, don't update
+        return
+    else:
+        json_dict = {}
+        prevres_set = set(prevres)
+        seen_set = set(seen)
+        # in previous, not in now, parked!
+        for i in prevres_set.difference(seen_set):
+            json_dict[name] = 'True' 
+        # in now, not in previous, not parked!
+        for i in seen_set.difference(prevres_set):
+            json_dict[name] = 'False'
+        requests.post('http://127.0.0.1:5000/tracker', data=json.dumps(json_dict), headers=headers)
+        prevres = seen
             
 def parse_args():
     global args
