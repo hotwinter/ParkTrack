@@ -8,6 +8,8 @@ from twisted.internet import reactor, defer
 import sllurp.llrp as llrp
 from sllurp.llrp_proto import Modulation_Name2Type, DEFAULT_MODULATION, \
     Modulation_DefaultTari
+import requests
+import json
 
 startTime = None
 endTime = None
@@ -16,7 +18,15 @@ numTags = 0
 logger = logging.getLogger('sllurp')
 
 args = None
+init = True
 
+COUNT = 0
+prevseen = []
+headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}
+HOST = '92f.co'
+PORT = 1338
+uids = {}
+prevres = {}
 
 def startTimeMeasurement():
     global startTime
@@ -45,20 +55,48 @@ def finish(_):
 def politeShutdown(factory):
     return factory.politeShutdown()
 
+def getStuff(tag):
+    return tag['EPC-96'], tag['PeakRSSI']
 
 def tagReportCallback(llrpMsg):
+    global prevseen
+    global uids
+    global COUNT
+    global prevres
     """Function to run each time the reader reports seeing tags."""
-    global numTags
     tags = llrpMsg.msgdict['RO_ACCESS_REPORT']['TagReportData']
-    if len(tags):
-        logger.info('saw tag(s): %s', pprint.pformat(tags))
-    else:
-        logger.info('no tags seen')
-        return
+    #print(tags)
+    #tags.sort()
+    seen = []
+    check = []
+    json_dict = {}
     for tag in tags:
-        numTags += tag['TagSeenCount'][0]
-
-
+        name, strength = getStuff(tag)
+        if name in uids:
+            seen.append(name)
+        check.append(name)
+    """
+    if COUNT == 5:
+        print(check)
+    """
+    # FIVE TIMES IN A ROW
+    if seen == prevseen:
+        COUNT += 1
+    else:
+        COUNT = 0
+    prevseen = seen
+    if COUNT == 5:
+        for i in uids:
+            if i in seen:
+                json_dict[i] = 'False'
+            else:
+                json_dict[i] = 'True' 
+        if prevres != json_dict:
+            print("Sending to webserver!")
+            requests.post('http://%s:%d/updateoccupy' %(HOST, PORT), data=json.dumps(json_dict), headers=headers)
+        prevres = json_dict
+        COUNT = 0
+            
 def parse_args():
     global args
     parser = argparse.ArgumentParser(description='Simple RFID Inventory')
@@ -118,9 +156,13 @@ def init_logging():
 
 
 def main():
+    global uids
     parse_args()
     init_logging()
 
+    for i in requests.get("http://%s:%d/getuids" %(HOST, PORT)).text.split('\n'):
+        i = str(i)
+        uids[i] = 'false'
     # special case default Tari values
     if args.modulation in Modulation_DefaultTari:
         t_suggested = Modulation_DefaultTari[args.modulation]
@@ -139,6 +181,7 @@ def main():
     d = defer.Deferred()
     d.addCallback(finish)
 
+
     fac = llrp.LLRPClientFactory(onFinish=d,
                                  duration=args.time,
                                  report_every_n_tags=args.every_n,
@@ -155,11 +198,11 @@ def main():
                                      'EnableROSpecID': False,
                                      'EnableSpecIndex': False,
                                      'EnableInventoryParameterSpecID': False,
-                                     'EnableAntennaID': True,
+                                     'EnableAntennaID': False,
                                      'EnableChannelIndex': False,
                                      'EnablePeakRRSI': True,
                                      'EnableFirstSeenTimestamp': False,
-                                     'EnableLastSeenTimestamp': True,
+                                     'EnableLastSeenTimestamp': False,
                                      'EnableTagSeenCount': True,
                                      'EnableAccessSpecID': False
                                  })

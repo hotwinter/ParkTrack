@@ -1,6 +1,6 @@
 from models import Park, NumCar
 from database import db_session
-from sqlalchemy import desc
+from sqlalchemy import desc, and_
 
 def update_slot(uid, status): 
     park = Park.query.filter(Park.uid == uid).first()
@@ -8,15 +8,20 @@ def update_slot(uid, status):
         park.status = status
 
 def insert(rid, cid, uid):
-    park = Park.query.filter((Park.rid == rid and Park.cid == cid)).first()
+    park = Park.query.filter(and_(Park.rid == rid, Park.cid == cid)).first()
     if park:
         park.uid = uid
     else:
         db_session.add(Park(rid, cid, uid))
     db_session.commit()
 
+def delete(rid, cid):
+    park = Park.query.filter(and_(Park.rid == rid, Park.cid == cid)).first()
+    db_session.delete(park)
+    db_session.commit()
+
 def update_uid(rid, cid, uid):
-    park = Park.query.filter((Park.rid == rid and Park.cid == cid)).first()
+    park = Park.query.filter(and_(Park.rid == rid, Park.cid == cid)).first()
     if park:
         park.uid = uid
     db_session.commit()

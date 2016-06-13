@@ -24,8 +24,18 @@
   {%- endwith %}
     <div class="jumbotron">
       <h1>ParkTrack</h1>
-      <h2>Current Number of Cars: {{ result['num'] }}</h2>
-      <h2>Current Number of Cars Out: {{ result['out'] }}</h2>
-      <h2>Current Number of Cars In: {{ result['in'] }}</h2>
+      <h2>Current Number of Cars: <span id="num">{{ result['num'] }}</span></h2>
+      <h2>Current Number of Cars Out: <span id="out">{{ result['out'] }}</span></h2>
+      <h2>Current Number of Cars In: <span id="in">{{ result['in'] }}</span></h2>
     </div>
+    <script>
+        var source = new EventSource('/updatecars');
+        source.onmessage = function (event) {
+            var json = JSON.parse(event.data);
+            $.each(json, function(index, val) {
+                document.getElementById(index).innerHTML=val;
+            })
+        }
+    </script>
 {%- endblock %}
+

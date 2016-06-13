@@ -28,17 +28,28 @@
     <div class="table-responsive">
         <table class="table">
             <tr>
+                <td>TAG</td>
                 <td>Row</td>
                 <td>Column</td>
                 <td>Parked</td>
             </tr>
             {% for row in result %}
             <tr>
+                <td>{{ row.uid }}</td>
                 <td>{{ row.rid }}</td>
                 <td>{{ row.cid }}</td>
-                <td>{{ row.status }} </td>
+                <td id= {{ row.uid }}>{{ row.status }} </td>
             </tr>
             {% endfor %}  
         </table>
     </div>
+    <script>
+        var source = new EventSource('/updateoccupy');
+        source.onmessage = function (event) {
+            var json = JSON.parse(event.data);
+            $.each(json, function(index, val) {
+                document.getElementById(index).innerHTML=val;
+            })
+        }
+    </script>
 {%- endblock %}

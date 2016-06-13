@@ -6,12 +6,15 @@
 import os
 import sys
 
+HOST = '127.0.0.1'
 sys.path.append(os.path.dirname(__name__))
 
 from parktrack import create_app
 
+if len(sys.argv) != 2:
+    print '%s: <port>' % sys.argv[0]
+    sys.exit()
 # create an app instance
 app = create_app()
 
-app.run(debug=True)
-
+app.run(debug=True, port=int(sys.argv[1]), host=HOST)

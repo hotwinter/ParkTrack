@@ -5,7 +5,7 @@
 # You can find out more about blueprints at
 # http://flask.pocoo.org/docs/blueprints/
 
-from flask import Blueprint, render_template, flash, redirect, url_for, request
+from flask import Blueprint, render_template, flash, redirect, url_for, request, json, Response
 from flask_bootstrap import __version__ as FLASK_BOOTSTRAP_VERSION
 from flask_nav.elements import Navbar, View, Subgroup, Link, Text, Separator
 from markupsafe import escape
@@ -64,39 +64,32 @@ def register():
 
 @frontend.route('/admin', methods=['GET', 'POST'])
 def admin():
-    form = InfoForm()
     if request.method == 'GET':
+        form = InfoForm()
         return render_template('admin.html', form=form)
     elif request.method == 'POST':
-        try:
-            insert(request.form['rid'], request.form['cid'], request.form['uid'])
-            flash("Success!")
-        except:
-            flash('Failed!')
+        if 'register' in request.form:
+            try:
+                insert(request.form['rid'], request.form['cid'], request.form['uid'])
+                flash("Success!")
+            except:
+                flash('Failed!')
+        elif 'delete' in request.form:
+            try:
+                delete(request.form['rid'], request.form['cid'])
+                flash('Success!')
+            except:
+                flash('Failed!')
         return redirect(url_for('.admin')) 
 
 @frontend.route('/summary', methods=['GET', 'POST'])
 def summary():
-    if request.method == 'GET':
-        return render_template('summary.html', result=get_num())
-    if request.method == 'POST':
-        if request.json:
-            data = request.get_json()
-            insert_summary(data['out'], data['in'])
-            return redirect(url_for('.summary'))
-
+    return render_template('summary.html', result=get_num())
+        
 @frontend.route('/tracker', methods=['GET', 'POST'])
 def tracker():
-    if request.method == 'GET':
-        return render_template('tracker.html', result=get_all_entry())
-    if request.method == 'POST':
-        if request.json:
-            data = request.get_json()
-            for uid in data:
-                update_slot(uid, True if data[uid] == 'True' else False)
-            return redirect(url_for('.tracker'))
-
-
+    return render_template('tracker.html', result=get_all_entry())
+        
 # Shows a long signup form, demonstrating form rendering.
 @frontend.route('/signin', methods=['GET', 'POST'])
 def signin():
@@ -119,3 +112,40 @@ def signin():
 @frontend.route('/about', methods=['GET'])
 def about():
     return render_template('about.html')
+
+def event_helper(dic):
+    response = Response('data: %s\n\n' % json.dumps(dic), mimetype='text/event-stream')
+    #response.headers['Cache-Control'] = 'no-cache'
+    return response
+
+@frontend.route('/updatecars', methods=['GET', 'POST'])
+def update_cars():
+    if request.method == 'POST':
+        if request.json:
+            data = request.get_json()
+            in_num = int(data["in"])
+            out_num = int(data["out"])
+            insert_summary(out_num, in_num)
+            return 'OK'
+        return 'LOL'
+    elif request.method == 'GET':
+        return event_helper(get_num())
+
+@frontend.route('/updateoccupy', methods=['GET', 'POST'])
+def updateoccupy():
+    if request.method == 'POST':
+        if request.json:
+            data = request.get_json()
+            for uid in data:
+                update_slot(uid, True if data[uid] == 'True' else False)
+            return 'OK'
+        return 'LOL'
+    elif request.method == 'GET': 
+        dic = {}
+        for i in get_all_entry():
+            dic[i.uid] = i.status 
+        return event_helper(dic)
+
+@frontend.route('/getuids', methods=['GET'])
+def getuids():
+    return '\n'.join(i.uid for i in get_all_entry())
