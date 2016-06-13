@@ -1,0 +1,194 @@
+\documentclass[12pt, a4paper]{article}
+
+\newcommand{\beq}{\begin{equation}}
+\newcommand{\eeq}{\end{equation}}
+\newcommand{\ba}{\begin{array}}
+\newcommand{\ea}{\end{array}}
+\newcommand{\bea}{\begin{eqnarray}}
+\newcommand{\eea}{\end{eqnarray}}
+\newcommand{\bc}{\begin{center}}
+\newcommand{\ec}{\end{center}}
+\newcommand{\ds}{\displaystyle}
+\newcommand{\bt}{\begin{table}}
+\newcommand{\et}{\end{table}}
+\newcommand{\la}[1]{\label{#1}}
+\newcommand{\p}{\partial}
+\newcommand{\pp}[2]{{\partial #1 \over \partial #2}}
+\newcommand{\ppn}[3]{{\partial^{#1} #2 \over \partial #3^{#1}}}
+\newcommand{\Pain}{Painlev\'{e} }
+\newcommand{\mbf}[1]{\mbox{\boldmath {$#1$}}}
+
+\def\Xint#1{\mathchoice
+   {\XXint\displaystyle\textstyle{#1}}%
+   {\XXint\textstyle\scriptstyle{#1}}%
+   {\XXint\scriptstyle\scriptscriptstyle{#1}}%
+   {\XXint\scriptscriptstyle\scriptscriptstyle{#1}}%
+   \!\int}
+\def\XXint#1#2#3{{\setbox0=\hbox{$#1{#2#3}{\int}$}
+     \vcenter{\hbox{$#2#3$}}\kern-.5\wd0}}
+\def\ddashint{\Xint=}
+\def\dashint{\Xint-}
+
+\usepackage{fullpage, amsmath, amsfonts,graphicx,float, hyperref}
+
+%\pagestyle{empty}
+
+
+
+\title{EE/CSE 475 Final Project Report
+		\\Complete Parking System}
+
+\author{Team YOLO\\\\EE senior, class of 2016: Haiwen Shi \\CE senior, class of 2017: Bo Wang \\EE senior, class of 2016: Zhuoer Wang}
+
+\date{}
+\begin{document}
+\maketitle
+\begin{abstract}
+With the advance of technology, automobiles becomes a primary source of transportation. As the number of personal automobiles increases, the  need for parking spaces also increase rapidly. Parking management thus has become a vital issue considering its efficiency, cost, occupancy, etc. Our complete parking system aims to simplify the parking management both for district shared parking and large multiple story parking garages. In addition, our system will collect traffic data for future analysis. We will do so by designing a robust and cost effective system that allows us to track the empty individual parking spaces and the total number of parking spaces available.
+\end{abstract}
+\newpage
+\tableofcontents
+\newpage
+\section{Goals of the Project}
+Our group aims to solve both the parking occupancy count and the individual parking spot search. The ultimate goal of our project is to reliably identify the total occupancy of the parking space/garage as well as identify individual empty parking slots. In addition, we will try to make our system relatively low power consumption and costs effective in both equipment cost and installation cost. The focus of our system is described as follow
+\begin{equation*}
+	\text{reliability }>\text{ installation cost }>\text{ equipment cost }>\text{ power consumption}
+\end{equation*}
+\section{System Design}
+\begin{figure}[ht!]
+	\centering
+	\includegraphics[width=\textwidth]{diagram}
+	\caption{Rough diagram of the system}
+	\label{fig:diagram}
+\end{figure}
+As shown in Figure \ref{fig:diagram}, we have two separate systems for conquering the two goals.
+\subsection{Laser System} 
+This system contains an Arduino Yun as the base controller and two pairs of laser transmitter/receiver with some distance in between the pair. The system aims to differentiate pedestrian and car via a simple state machine. The intuition here is that an automobile will be able to block both lasers at a certain time, while a pedestrian will not. By tracking the state of the laser receiver's change, we can also tell the direction the automobile is heading. In addition to the hardware components, we also have written a simple Serial to HTTP proxy to direct the traffic to our web server.
+\subsection{RFID System}
+This system consists of RFID router, RFID antenna, and a modified version of the software we used for detecting RFID tags (see Section~\ref{sec:sllurp}). The key concept of the system is simple. Since automobiles are mainly made out of metal, it will have great disturbance for radio signals, worst case, it will block radio signals entirely. By detecting either a decrease in signal strength or whether we can still detect the tag, we can tell the difference between the parking slot taken or not (With parked slot resulting in a significant signal strength decrease or tag undetectable). The passive RFID tags will be sticked on to each parking slot. Since each tag will have a UUID, by building a relationship between UUID and the parking slot, we have a system that will be able to track individual parking slots.
+\subsection{Main Computer and Server}
+The main computer will be served as an admin interface to glue the two systems together. It will send requests to the server via a POST request in JSON format. The server will then update the page in realtime via Server Side Event. The server is implemented in python Flask and also contains a management interface for mapping rfid UUIDs to parking slot number. The web server is then hosted using uwsgi and nginx on AWS EC2 instance.
+\section{Strength/Features}
+We summarize our strength and features as the following points, in order of decreasing priority
+\begin{itemize}
+	\item \textbf{Reliability}
+	
+	The biggest strength of our complete parking system is our system accuracy. As we have demonstrated during the presentation, our laser system is very effective and reliable in differentiating pedestrian/automobile, and detecting the occupancy of the garage. In addition we have also proved that our RFID system is extremely reliable even when handling multiple parking slots.
+	\item \textbf{Real time Reflection}
+	
+	Another big strength of our system is that any change in the system will be reflected in real time (less than 1s) on the website.
+	\item \textbf{Low installation cost}
+	
+	We have an extremely low installation cost compared to the other concurrent parking management system (such as camera based or magnetometer based). Passive RFID tags can be simply sticked to the parking slot without any additional installation. The laser system is also easy to install and adjust
+	\item \textbf{Low average parking lot cost}
+	
+	Even though RFID router and antenna have a high price, our RFID system can cover at least 6 parking slots at a time. Since passive RFID tags cost around 20 cents, we have a pretty reasonable low cost per parking slot. Thus large multi story parking garages might benefit more from our system. 
+	\item \textbf{Low per parking lot power consumption}
+	
+	Passive RFID tags requires no power. However we do have a good amount of power consumption from the laser system and the RFID router/antenna
+\end{itemize}
+\section{Unknowns/Limitations/Risks}
+\label{sec:limit}
+\subsection{Laser System}
+Our laser system works surprisingly well, hence there are not many limitations we can think of. One of the limitation we can think of would be if there are false positives in automobile detection. i.e. When two automobile or two pedestrian accidentally block both lasers at the same time. Then our system would either miss one car or detect a "fake" car. One mitigation we can think of would be to increase the distance between the transmitter pairs and/or add one more laser in the middle for reliability increase. But in general our system works really well for those garages that have a narrow gateway
+\subsection{RFID System}
+There could be some potential limitations for the RFID system
+\begin{itemize}
+	\item \textbf{Angle Adjustment}
+	
+	One biggest limitation for our RFID system is the adjustment angle of antenna. In our experiment, the antenna will still be able to detect the tag even with a distance of over 40m. However, this is not the case with the angle of the antenna. As the tag begins to fall out of the $\pm30\deg$ angle covered by the antenna. the router has a half of the chance not being able to identify the tag. We regard this as an unusable state. We have came up with several theoretical approaches in solving the problem
+	\begin{itemize}
+		\item Increasing the height of antenna, such that it can cover more tags
+		\item Implement a radar like system where the antenna rotates and scans the tag from different angles.
+		\item Use a multiple antenna system
+	\end{itemize}
+	\item \textbf{Signal Strength decrease}
+	
+	This is one problem that we have thought of, yet not tested (due to the limitation of the testing garage). A thick cement pillar might be able to block the antenna from reading the tag.
+\end{itemize}
+\section{Changes}
+We haven't modified anything on the RFID system side, but we do have a great change of plan on the laser system side.
+\subsection{Laser System}
+In our initial design the laser system does not exist, instead a pair of ultrasonic range finders were used. However, during testing, we have discovered bouncing effects from the sensor. The effect caused both sensors to interfere with each other's reading. Hence resulting in an unreliable system. We thus replaced the ultrasonic range finder with lasers. Since lasers are independent of each other and won't cause interference.
+\\
+Our initial laser system design has the receiver and transmitter on the same board. So that we had to use a mirror to reflect the laser back from the other side of the wall. This setup is both a huge pain to adjust and setup. However, the system works perfectly when we tested with hands. 
+\\
+The problem occurs when we tested with real cars during our milestone. The system recorded an incorrect number of cars. In particular, it recorded more number of cars than actual (For both incoming and outgoing). We quickly identified the issue to be the laser reflection from the car. Since the car has a mirror-like surface, when the car is close to our system, it will bounce off laser beams randomly and result in an error in detection. 
+\\
+Our approach to solving this issue is to separate the receiver and the transmitter end. We found some spare laser transmitter of a different brand we can use. However, this results in another issue of mis aligned frequency between the transmitter and the receiver. The result of this is that the receiver would only work if the laser is pointed directly into the middle. In order to solve this, we have to solder a long wire on to the receiver board's transmitter laser (we also desoldered the transmitter laser) and then use it to power the other transmitter board. With this approach, our laser system works perfectly fine.
+\section{Implementation post-mortem}
+Our project mostly worked out as scheduled. Our milestone check off didn’t really work well but as we mentioned in the previous section, we figure out the issue and successfully resolved it. Before this issue occurs, we have done all our laser system testing in lab instead of the garage, so we forgot about the fact that cars can reflect our laser beams. Now, after we notice this issue, we would implement the system as the way we set up now, which is, placing the transmitter and receiver on both sides, instead of on the same side.
+\section{Evaluation}
+\subsection{Overall System}
+As we stated before, our system worked surprisingly well, both for real time detection and for accuracy. Unfortunately there's no specific data we have that can demonstrate how well the system is working (since all our data is the number of cars in and out and the status of individual parking spot, which are pointless without context), but we do have videos demonstrating it and it's available in our github repo in Appendix. We have discussed it's limitation in Section~\ref{sec:limit}
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{fig1}
+	\caption{An complete setup of our system inside the CSE garage}
+\end{figure}
+\subsection{Laser System}
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{fig2}
+	\caption{Laser Transmitter setup}
+\end{figure}
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{fig3}
+	\caption{Laser Receiver Setup}
+\end{figure}
+Specifically for the laser, the way we differentiate between pedestrian or car is by using a state machine. This is shown as a different pattern from the laser receiver. The pattern is shown below, with 0 as blocked (can't receive laser), the data has the format (leftlaser-rightlaser):
+
+\begin{align*}
+	\text{Car: }&\text{0-0}\rightarrow\text{0-1}\rightarrow\text{1-1}\rightarrow\text{1-0}\rightarrow\text{0-0}&\text{ or the other way around}\\ 
+	\text{Pedestrian: }&\text{0-0}\rightarrow\text{0-1}\rightarrow\text{1-0}\rightarrow\text{0-0}&\text{ or the other way around}
+\end{align*}
+There are circumstances where the pedestrian can block both light at the same time, like when several people go in or out at the same time.
+So, in the future, we will add more laser sensor to make the system more accurate.
+\subsection{RFID System}
+The RFID system works well after we made a few changes to it.
+\begin{enumerate}
+	\item We figured out that the sllurp library and/or Impinj RFID Router have some sort of a glitch. Where it will occasionally not detect the tag. (This is why our status update flips between true and false during the milestone checkpoint). We came up with a solution by spotting that the glitch only occur once in a long sequence of correct detection. Thus we fixed it by only updating the website when it sees five same results in a row.
+	\item We also had trouble with real time update due to sending too many requests to the server. So many that the server slows down it's processing speed. Since we are using an event-based design from sllurp, there's not a good way of resolving this issue. instead, we check if the current update is the same as the previous update and we only send it to the server if it's different
+\end{enumerate}
+After these changes, the RFID works without a problem. For one parking spot, the status will be updated in less than 0.5s. For two spots, it takes a bit longer time. But still less than 1s. This issue may need to be fixed afterwards.
+\subsection{Website}
+Below are the screen shots of the website that we developed.
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{fig4}
+	\caption{Gate System Page (Summary Page)}
+\end{figure}
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{fig5}
+	\caption{Individual Spot Page (Tracker Page)}
+\end{figure}
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{fig6}
+	\caption{RFID Tag Management Page (Admin Page)}
+\end{figure}
+The webserver as mentioned before uses Server Side Event for real time update. updateoccupy and updatecars are two pages created for this purpose, then the html page is rendered automatically by javascript. For more information on Server Side Update check Appendix
+\subsection{Conclusion}
+In general we think our project is pretty successful on the basis of the following:
+\begin{itemize}
+	\item Our gate system can successfully detect whether a car/pedestrian come in/out
+	\item Our gate system can successfully count up when a car enters into the garage and count down when a car leaves out of the garage
+	\item Our RFID system can determine if a certain parking spot is available or not
+	\item Our two sub-systems can successfully transmit all the data back to our server
+	\item Our website can precisely and quickly displays how many parking spots left and if each individual parking slot is available or not.
+	\item Our website refreshes very quickly with the real-time changes without user's need to manually refresh
+\end{itemize}
+\section{Related Work}
+\label{sec:sllurp}
+During research, we have found that there are no similar work than our RFID tracking system or laser counter system, which shows the novelty of our design. However, for the RFID system, we did use an RFID library called sllurp. Thus our RFID system is built on top of sllurp's inventory.py, a link to sllurp has also been included in our github repo. The key difference between our script and sllurp's script is we added tag handling and server update in the callback method called when tags are seen by the antenna.
+\section{Teamwork Report}
+Discussion plays an important role in our team. The whole plan is under the discussion among all of us. More specifically, Bo is in charge of the implementation of RFID system and Website development then Haiwen and Zhuoer are in charge of setup and all of us are involved in testing. Haiwen is in charge of the gateway system (Laser System). Haiwen and Zhuoer are in charge of the test of Laser System. Bo provided suggestions to the laser system and helped in debugging. Zhuoer is in charge of recording data, communication and writing reports and presentations, like PPT and Proposal and so on. Haiwen and Bo is then in charge of proof read and advices. Bo is in charge of final draft. Of course, everyone more or less helped each other in between these problems, giving advice, helping debugging and so on. Our team has a pretty good skillset. We have Bo, who is interested and pretty good at software design and coding, and Haiwen who is good at hardware’s setup, and Zhuoer, who loves to record and test what the team has done and explain them explicitly in the writing and set up the team meetings for keeping us on track.
+\newpage
+\appendix
+\section{Appendix}
+Team Github Repo: \url{https://github.com/hotwinter/ParkTrack}\\
+Server Side Update: \url{http://www.w3schools.com/html/html5_serversentevents.asp}\\
+Sllurp: \url{https://github.com/ransford/sllurp}
+\end{document}

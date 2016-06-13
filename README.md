@@ -16,7 +16,7 @@ Requirement: [sllurp](https://github.com/ransford/sllurp)
 [website](website)
 
 ## PicsAndVideos
-[data](PicsAndVideos.zip)
+[data](PicAndVideo.zip)
 
 
 ## Presentation Related
